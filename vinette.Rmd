@@ -1,6 +1,17 @@
+Title
+========================================================
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring web pages (click the **Help** toolbar button for more details on using R Markdown).
+
+When you click the **Knit HTML** button a web page will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+rm(list=ls())
 source("http://bioconductor.org/biocLite.R")
-biocLite("DESeq")
-biocLite("pasilla")
+biocLite("BiocUpgrade")
+source("http://stevenbsmith.net/")
+#biocLite("DESeq")
+#biocLite("pasilla")
 library("DESeq")
 datafile =system.file( "extdata/pasilla_gene_counts.tsv", package="pasilla" )
 datafile
@@ -85,12 +96,10 @@ sumDispsB <- (fullVarsB - mus * sum(sizeFactorsB))/(mus *sum(sizeFactorsB))^2
 
 #For each of the counts in A
 sapply(seq(along = kAs), function(i) {
-i<-9831
   if (kAs[i] == 0 & kBs[i] == 0) 
     return(NA)
   ks <- 0:(kAs[i] + kBs[i]) #seq from 0 to gene i's total counts 
-  ?dnbinom
-  
+
   pa <- dnbinom(ks, mu = mus[i] * sum(sizeFactorsA), size = 1/sumDispsA[i]) # my addition
   pb <- dnbinom(kAs[i] + kBs[i] - ks, mu = mus[i] * sum(sizeFactorsB), size = 1/sumDispsB[i]) # my addition
 
@@ -121,3 +130,6 @@ kBs[i] /kAs[i]
 })
 
 nbinomTestForMatrices(counts(cds)[, colA], counts(cds)[,colB], sizeFactors(cds)[colA], sizeFactors(cds)[colB],rawScvA, rawScvB)
+
+```
+

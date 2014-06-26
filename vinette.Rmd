@@ -8,13 +8,14 @@ When you click the **Knit HTML** button a web page will be generated that includ
 ```{r}
 rm(list=ls())
 source("http://bioconductor.org/biocLite.R")
-biocLite("BiocUpgrade")
-source("http://stevenbsmith.net/")
-#biocLite("DESeq")
+source("http://stevenbsmith.net/source/load_R_enviornment_vars.R")
+#biocLite("DESeq2")
 #biocLite("pasilla")
 library("DESeq")
+#library("DESeq2")
+library("knitr")
 datafile =system.file( "extdata/pasilla_gene_counts.tsv", package="pasilla" )
-datafile
+#datafile
 pasillaCountTable = read.table( datafile, header=TRUE, row.names=1 )
 
 
@@ -24,34 +25,29 @@ pasillaDesign = data.frame(
                  "untreated", "treated", "treated", "treated" ),
   libType = c( "single-end", "single-end", "paired-end",
                "paired-end", "single-end", "paired-end", "paired-end" ) )
+pasillaDesign
 
 pairedSamples = pasillaDesign$libType == "paired-end"
 countTable = pasillaCountTable[ , pairedSamples ]
 condition = pasillaDesign$condition[ pairedSamples ]
+
 head(countTable)
 
 cds = newCountDataSet( countTable, condition )
 cds = estimateSizeFactors( cds )
 sizeFactors( cds )
 head( counts( cds, normalized=TRUE ) )
-head(counts(cds))
-library("reshape")
-library("ggplot2")
-temp<-melt(counts(cds))
-temp2<-melt(counts(cds, normalized=TRUE ))
-head(temp)
-temp[temp$X1=="FBgn0025692",]
-ggplot(temp2)+ geom_bar(aes(x=value,fill=X2))+ facet_wrap(~ X2,ncol=1)
-
+head( counts( cds, normalized=FALSE ) )
 
 cds = estimateDispersions( cds )
 str( fitInfo(cds) )
-plotDispEsts( cds )
+
+DESeq::plotDispEsts( cds )
 head(fitInfo(cds))
 head(counts(cds))
 res = nbinomTest( cds, "untreated", "treated" )
 
-plotMA(res)
+DESeq::plotMA(res)
 
 ## Under the hood of nbinomTest and nbinomTestForMatrices...
 
@@ -90,7 +86,7 @@ mus <- rowMeans(cbind(t(t(countsA)/sizeFactorsA), t(t(countsB)/sizeFactorsB)))
 fullVarsA <- pmax(mus * sum(sizeFactorsA) + dispsA * mus^2 *sum(sizeFactorsA^2), mus * sum(sizeFactorsA) * (1 + 1e-08))
 fullVarsB <- pmax(mus * sum(sizeFactorsB) + dispsB * mus^2 *sum(sizeFactorsB^2), mus * sum(sizeFactorsB) * (1 + 1e-08))
 
-#  (v-q0*sum(s))/(q0*sum(s))^2 .. this is alpha.. solved for by using NB variance, means, and s (vinette, pg 4)
+#  (v-q0*sum(s))/(q0*sum(s))^2 .. this is alpha.. solved for by using NB variance, means, and s (vinette, pg 4). I dont get why this needs to be done realtive to the above. 
 sumDispsA <- (fullVarsA - mus * sum(sizeFactorsA))/(mus *sum(sizeFactorsA))^2
 sumDispsB <- (fullVarsB - mus * sum(sizeFactorsB))/(mus *sum(sizeFactorsB))^2
 
@@ -108,12 +104,12 @@ sapply(seq(along = kAs), function(i) {
   ps <- dnbinom(ks, mu = mus[i] * sum(sizeFactorsA), size = 1/sumDispsA[i]) * 
     dnbinom(kAs[i] + kBs[i] - ks, mu = mus[i] * sum(sizeFactorsB), size = 1/sumDispsB[i])
 
-plot(ks,ps/sum(ps), col="black")
-points(ks,pa/sum(pa),col="red")
-points(ks,pb/sum(pb),col="blue")
+#plot(ks,ps/sum(ps), col="black")
+#points(ks,pa/sum(pa),col="red")
+#points(ks,pb/sum(pb),col="blue")
 
-abline(v=kAs[i],col="red")
-abline(v=kBs[i],col="blue")
+#abline(v=kAs[i],col="red")
+#abline(v=kBs[i],col="blue")
 
 #return the probably of observing a and b counts under a negative binomial distribution gievn q0*sum(s) and 1/alpha. this is p(a=A,b=B)=p(A)*p(B)
   pobs <- dnbinom(kAs[i], mu = mus[i] * sum(sizeFactorsA), size = 1/sumDispsA[i]) * 
@@ -129,7 +125,84 @@ abline(v=kBs[i],col="blue")
 kBs[i] /kAs[i] 
 })
 
-nbinomTestForMatrices(counts(cds)[, colA], counts(cds)[,colB], sizeFactors(cds)[colA], sizeFactors(cds)[colB],rawScvA, rawScvB)
+#nbinomTestForMatrices(counts(cds)[, colA], counts(cds)[,colB], sizeFactors(cds)[colA], sizeFactors(cds)[colB],rawScvA, rawScvB)
 
 ```
 
+```{r}
+gene_of_interest<-"FBgn0039155"
+goi_row_index<-featureNames(cds)==gene_of_interest
+counts(cds)[goi_row_index,]
+sizeFactors(cds)
+#observed count/size factor = normalized count
+741/0.8730966
+counts(cds,normalized=TRUE)[goi_row_index,]
+
+(meanA<-mean(c(848.70330,921.22473)))
+(meanB<-mean(c(37.16557,46.65398)))
+(fc<-meanB/meanA)
+(log2fc<-log(fc,base=2))
+head(res)
+
+res[res$id==gene_of_interest,]
+
+(mu_goi<-mean(c(884.964,41.90977)))
+i<-9831
+```
+What is the probability of observing a mean count of `r meanA` in group A, given the following pieces of information:
+1. the counts follow a negative binomial distribution
+2. the mean count, under the null that meanA=meanB, is estimated to be `r mu_goi`
+3. The dispersion for group A for this goi is `r sumDispsA[i]` (which is estimated previously, see above.)
+
+```{r}
+(pobsA<-dnbinom(kAs[i], mu = mu_goi * sum(sizeFactorsA), size = 1/sumDispsA[i]) )
+## Notice the mean is a comprimise between the two seperate distributions for kA and kB. 
+## If the mean was much closer to the value of kA, for instance, the pobs would be much greater, but still realtivley small b/c it is a density
+(dnbinom(kAs[i], mu = kAs[i], size = 1/sumDispsA[i]) )
+## but for probability mass function, the value is very close to 50%
+(pnbinom(kAs[i], mu = kAs[i], size = 1/sumDispsA[i]) )
+```
+
+Anagolously, find the probability of observing B under the null (meanA=meanB), B's counts and B's dispersion: `r sumDispsB[i]`
+
+```{r}
+(pobsB<-dnbinom(kBs[i], mu = mu_goi * sum(sizeFactorsB), size = 1/sumDispsB[i]) )
+```
+Notice again that although it's a desnity, the probabliity is still relatley small. 
+
+Plot where these observed probabilities are for each distribution on the same plot for the range of observed counts:
+
+```{r}
+nbin_A<-dnbinom(0:kAs[i] + kBs[i],size = 1/sumDispsA[i],mu=mu_goi * sum(sizeFactorsA))
+plot(0:kAs[i] + kBs[i],nbin_A,col='blue')
+abline(h=pobsA,col='blue')
+abline(v=kAs[i],col='blue')
+nbin_B<-dnbinom(0:kAs[i] + kBs[i],size = 1/sumDispsB[i],mu=mu_goi * sum(sizeFactorsB))
+points(0:kAs[i] + kBs[i],nbin_B,col='red')
+abline(h=pobsB,col='red')
+abline(v=kBs[i],col='red')
+
+```
+What is the *POINT ESTIMATE* joint probability of observing both the counts from a and b together?
+```{r}
+(p_joint<-pobsA*pobsB)
+ps <- dnbinom((0:(kAs[i] + kBs[i])), mu = mus[i] * sum(sizeFactorsA), size = 1/sumDispsA[i]) * 
+    dnbinom((kAs[i] + kBs[i]) - (0:(kAs[i] + kBs[i])), mu = mus[i] * sum(sizeFactorsB), size = 1/sumDispsB[i])
+
+```
+
+What is the joint probability of a & b or less extreme?
+```{r}
+if (kAs[i] * sum(sizeFactorsB) < kBs[i] * sum(sizeFactorsA)) numer <- ps[1:(kAs[i] + 1)] else numer <- ps[(kAs[i] + 1):length(ps)]
+  min(1, 2 * sum(numer)/sum(ps))
+
+```
+
+Take home and what is needed to understand:
+1. Dispersion estimation/fomulas/why using sum of size factors and dispersions
+2.  Exact versus summation of probabilities
+3. Last output regarding the tails
+4. Joint probabilities versus alone: realize that the pobsA and pobsB might not make sense given that both use a mean that is derived from the average of both A and B group means. What might make more sense is to plot each distribtion seperatley using means as calculated previously and plotting for a range. However, realize that k=u*s, so I exect each distribution to have the counts centered around the mean.. so this again doesnt make much interpretable sense. only in the context of exact tests would the porbability make sse. \
+5. Size factors, when to use normalized counts vesus raw counts versus size factors, etc. 
+6. What to expect when data is Possion (doesnt have any dispersion, i.e., alpha=0 for all counts)
+7. Does the dispersion plot plot each gene, mean gene per group, or genes summed over group? How are dispersions estimated- per group, per gene or per sample

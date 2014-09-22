@@ -50,7 +50,7 @@ for(i in 1:length(alignment_file_list)){
 colnames(counts)<-gsub("_th2out_accepted_hits.bam.sort.bam","",colnames(counts))
 ### And now, the heavy lifting (summarieOverlaps of 56 alignment files)
 #sumOl<-summarizeOverlaps(exbygene, reads, mode="Union") ## union is reccomended by DESeq
-
+save(counts,file="counts.R")
 library(DESeq2)
 (colData<-data.frame(sample_name=colnames(counts),isoform=c(rep("D",times=6),rep("DL",times=4),rep("HCL",times=6),rep("L",times=6),rep("MED",times=4)),
       pH=c(rep(4,times=4),rep(7,times=2),rep(4,times=3),7,rep(4,times=4),7,7,4,4,4,4,7,7,rep("MED",times=4)),
@@ -58,6 +58,8 @@ library(DESeq2)
                   rep("CT",times=2),rep("uninfected",times=4),rep("CT",times=2),rep("uninfected",times=2)),
       replicate=1*grepl(pattern = "rep1",colnames(counts))+2*grepl(pattern = "rep2",colnames(counts)))
 )
+
+browseVignettes("DESeq2")
 dds<-DESeqDataSetFromMatrix(countData=counts,colData=colData,design=~infection + isoform)
 colData(dds)$infection<-factor(colData(dds)$infection,levels=c("uninfected","CT"))
 colData(dds)$isoform<-factor(colData(dds)$isoform,levels=c("MED","HCL","DL","L","D"))

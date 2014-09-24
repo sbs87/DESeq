@@ -4,7 +4,8 @@
 # The summarizeOverlaps step takes up a tremendous amount of RAM and processing power. This needs to be run on the grid.
 
 ### Set up enviornment
-source("http://bioconductor.org/biocLite.R")
+rm(list=ls())
+#source("http://bioconductor.org/biocLite.R")
 #biocLite("GenomicRanges")
 library(GenomicRanges)
 #biocLite("GenomicAlignments")
@@ -59,8 +60,9 @@ library(DESeq2)
       replicate=1*grepl(pattern = "rep1",colnames(counts))+2*grepl(pattern = "rep2",colnames(counts)))
 )
 
-browseVignettes("DESeq2")
-dds<-DESeqDataSetFromMatrix(countData=counts,colData=colData,design=~infection + isoform)
+#browseVignettes("DESeq2")
+
+dds<-DESeqDataSetFromMatrix(countData=counts,colData=colData,design=~isoform +pH | infection)
 colData(dds)$infection<-factor(colData(dds)$infection,levels=c("uninfected","CT"))
 colData(dds)$isoform<-factor(colData(dds)$isoform,levels=c("MED","HCL","DL","L","D"))
 dds
@@ -68,13 +70,44 @@ dds<-DESeq(dds)
 res<-results(dds)
 (res<-res[order(res$padj),])
 save(res,file="Infection_Isoform.DESeq2Results")
-write.table(rownames(head(res,n=200)),file="Infection_Isoform.topgenes.DESeq2Results",sep="\t")
+load("Infection_Isoform.DESeq2Results")
+(sig.genes<-res[(abs(res$log2FoldChange)>1.5 & res$padj<0.01 & !is.na(res$padj)),])
+res[(abs(res$log2FoldChange)<1.5 & res$padj>0.01 & !is.na(res$padj)),]
+write.table(row.names(sig.genes),quote=F,sep="\t",file="signifigant_genes.txt",row.names = F,col.names = F)
+res.counts<-assays(dds)$counts
+#(top.counts<-data.frame(res.counts[rownames(res.counts) %in% rownames(head(res)),]))
+#names(top.counts)<-colData[,1]
+
+library(ggplot2)
+ENS_hugo_map<-read.table("ENS_hugo_map.txt",sep="\t",header=T)
+for(i in 1:length(ENS_hugo_map$Gene)){
+  Ens.id<-as.character(ENS_hugo_map$Ensembl_Gene[i])
+  Ens.id<-"ENSG00000135414"
+  Hugo.id<-as.character(ENS_hugo_map[ENS_hugo_map$Ensembl_Gene==Ens.id,]$Gene)
+  current.title<-paste(Ens.id,"_",Hugo.id,".ps",sep="")
+  pick_gene<-data.frame(counts=res.counts[rownames(res.counts)==Ens.id,],colData(dds))
+  rownames(pick_gene)<-as.character(colData(dds)$sample_name)
+  pick_gene$isoform<-factor(pick_gene$isoform,levels = c("HCL","DL","L","D","MED"),ordered=T)
+  pick_gene$pH<-factor(pick_gene$pH,levels = c("4","7","MED"),ordered=T)
+  postscript(file=current.title,horizontal = T)
+  f<-ggplot(pick_gene)+geom_bar(aes(x=infection,y=counts,fill=isoform),stat="identity") +facet_wrap(~pH+isoform,ncol=4)+ggtitle(current.title)+theme_bw()
+  plot(f)
+  dev.off()
+
+}
+#top.counts
+plot(res$log2FoldChange, -log(res$padj,base = 10),main="Volcano Plot of DESeq2 Results, isoform + infection",xlab="log2(FoldChange)",ylab="-log10(Adjusted p-value)")
+
+abline(h = -log(0.01,base=10),col='red')
+abline(v=-1.5,col='red')
+abline(v=1.5,col='red')
+
 plotMA(dds,ylim=c(-2,2))
 
 mcols(res,use.names=TRUE)
 colData(dds)
 resultsNames(dds)
-results(dds,"isoform_vs_MED")
+
 
 rld<-rlogTransformation(dds,blind=T)
 print(plotPCA(rld,intgroup=c("replicate")))
@@ -93,3 +126,12 @@ mat<-as.matrix(distsRL)
 rownames(mat)<-colnames(mat)<-with(colData(dds),
                                    paste(pH,infection,isoform,sep=":"))
 heatmap.2(mat,trace="none",col=rev(hmcol),margin=c(13,13))
+
+library(DESeq)
+library(edgeR)
+edgeRUsersGuide()
+
+counts<-assays(dds)$counts
+counts[counts=="ENSG00000006652"]
+
+res

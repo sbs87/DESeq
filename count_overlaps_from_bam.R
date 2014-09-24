@@ -62,15 +62,16 @@ library(DESeq2)
 
 #browseVignettes("DESeq2")
 
-dds<-DESeqDataSetFromMatrix(countData=counts,colData=colData,design=~isoform +pH | infection)
+dds<-DESeqDataSetFromMatrix(countData=counts,colData=colData,design=~isoform + infection)
 colData(dds)$infection<-factor(colData(dds)$infection,levels=c("uninfected","CT"))
 colData(dds)$isoform<-factor(colData(dds)$isoform,levels=c("MED","HCL","DL","L","D"))
 dds
 dds<-DESeq(dds)
 res<-results(dds)
 (res<-res[order(res$padj),])
-save(res,file="Infection_Isoform.DESeq2Results")
-load("Infection_Isoform.DESeq2Results")
+res <- results( dds, contrast = c("isoform", "L", "DL") )
+
+
 (sig.genes<-res[(abs(res$log2FoldChange)>1.5 & res$padj<0.01 & !is.na(res$padj)),])
 res[(abs(res$log2FoldChange)<1.5 & res$padj>0.01 & !is.na(res$padj)),]
 write.table(row.names(sig.genes),quote=F,sep="\t",file="signifigant_genes.txt",row.names = F,col.names = F)
